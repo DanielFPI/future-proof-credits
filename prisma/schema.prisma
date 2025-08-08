@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Tier {
+  INDIVIDUAL
+  TEAM
+  ENTERPRISE
+}
+
+enum Role {
+  USER
+  ORG_ADMIN
+  FP_ADMIN
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  hashedPassword String?
+  name           String?
+  avatarUrl      String?
+  twoFAEnabled   Boolean  @default(false)
+  role           Role     @default(USER)
+  orgMemberships Membership[]
+  listings       Listing[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  domain    String?
+  tier      Tier     @default(INDIVIDUAL)
+  seats     Int      @default(1)
+  walletId  String   @unique
+  wallet    CreditAccount @relation(fields: [walletId], references: [id])
+  members   Membership[]
+  projects  Project[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  orgId     String
+  isOwner   Boolean  @default(false)
+  role      Role     @default(USER)
+  user      User     @relation(fields: [userId], references: [id])
+  org       Organization @relation(fields: [orgId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Project {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  orgId        String?
+  org          Organization? @relation(fields: [orgId], references: [id])
+  members      ProjectMember[]
+  messages     ChatMessage[]
+  bountyAcctId String?  @unique
+  bountyAcct   CreditAccount? @relation(fields: [bountyAcctId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ProjectMember {
+  id         String   @id @default(cuid())
+  projectId  String
+  userId     String
+  role       String
+  project    Project  @relation(fields: [projectId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  projectId  String
+  userId     String
+  body       String
+  attachments Json?
+  project    Project  @relation(fields: [projectId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+model Listing {
+  id          String   @id @default(cuid())
+  orgId       String?
+  userId      String?
+  title       String
+  kind        String
+  pricingType String
+  price       Int
+  metadata    Json?
+  ownerOrg    Organization? @relation(fields: [orgId], references: [id])
+  ownerUser   User? @relation(fields: [userId], references: [id])
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Booking {
+  id            String   @id @default(cuid())
+  listingId     String
+  buyerUserId   String?
+  buyerOrgId    String?
+  status        String
+  escrowEntryId String?
+  listing       Listing  @relation(fields: [listingId], references: [id])
+  buyerUser     User?    @relation(fields: [buyerUserId], references: [id])
+  buyerOrg      Organization? @relation(fields: [buyerOrgId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model CreditAccount {
+  id         String   @id @default(cuid())
+  ownerType  String
+  ownerId    String
+  balance    Int      @default(0)
+  entries    CreditEntry[]
+}
+
+model CreditEntry {
+  id            String   @id @default(cuid())
+  accountId     String
+  amount        Int
+  kind          String
+  refType       String?
+  refId         String?
+  createdAt     DateTime @default(now())
+  account       CreditAccount @relation(fields: [accountId], references: [id])
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  orgId       String
+  amountCents Int
+  credits     Int
+  stripeId    String?
+  createdAt   DateTime @default(now())
+}
+
+model Invite {
+  id        String   @id @default(cuid())
+  email     String
+  projectId String?
+  orgId     String?
+  token     String   @unique
+  role      String
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  target    String?
+  data      Json?
+  createdAt DateTime @default(now())
+}
